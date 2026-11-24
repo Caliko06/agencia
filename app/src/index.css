@@ -1,0 +1,770 @@
+/* Hallmark · shape: app screen · genre: atmospheric · theme: obsidian-horizon · redesign: full · contrast: pass · v2.0.0 */
+/* Hallmark · critique: unified Agencia Studio architectural layout (NavRail + TopRibbon + split AgentInspector + 6 views) with solid OKLCH surfaces, single-hue directional gradients, shadcn tokens, and zero glass blur */
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --font-sans: "Geist Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius: 0.625rem;
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-press: 120ms;
+  --dur-fast: 140ms;
+  --dur-exit: 140ms;
+  --dur-overlay: 200ms;
+  --dur-tooltip-out: 50ms;
+
+  /* Light Theme — Swiss Daylight Precision */
+  --bg-canvas: oklch(0.968 0.006 250);
+  --bg-rail: oklch(0.948 0.007 250);
+  --bg-surface: oklch(0.988 0.005 250);
+  --bg-elevated: oklch(0.992 0.005 250);
+  --bg-inset: oklch(0.936 0.007 250);
+  --bg-hover: oklch(0.922 0.008 250);
+  --bg-active: oklch(0.898 0.01 250);
+
+  --ink-1: oklch(0.15 0.01 252);
+  --ink-2: oklch(0.38 0.012 252);
+  --ink-3: oklch(0.41 0.012 252);
+  --ink-inv: oklch(0.985 0.005 250);
+
+  --border: oklch(0.16 0.012 252 / 11%);
+  --border-strong: oklch(0.16 0.012 252 / 19%);
+  --border-subtle: oklch(0.16 0.012 252 / 6%);
+  --hi: inset 0 1px 0 oklch(0.99 0.005 250 / 80%);
+
+  /* Semantic Status Signals (Light) */
+  --sig-work: oklch(0.54 0.165 245);
+  --sig-work-soft: oklch(0.54 0.165 245 / 10%);
+  --sig-work-border: oklch(0.54 0.165 245 / 34%);
+
+  --sig-need: oklch(0.6 0.165 68);
+  --sig-need-text: oklch(0.45 0.14 68);
+  --sig-need-ink: oklch(0.16 0.035 68);
+  --sig-need-soft: oklch(0.6 0.165 68 / 12%);
+  --sig-need-border: oklch(0.6 0.165 68 / 38%);
+
+  --sig-bad: oklch(0.55 0.205 22);
+  --sig-bad-soft: oklch(0.55 0.205 22 / 10%);
+  --sig-bad-border: oklch(0.55 0.205 22 / 36%);
+
+  --sig-ok: oklch(0.52 0.15 158);
+  --sig-ok-soft: oklch(0.52 0.15 158 / 10%);
+  --sig-ok-border: oklch(0.52 0.15 158 / 34%);
+
+  --sig-idle: oklch(0.56 0.01 252);
+
+  /* Brand marks */
+  --brand-claude: oklch(0.64 0.14 38);
+  --brand-codex-a: oklch(0.6 0.17 252);
+  --brand-codex-b: oklch(0.48 0.18 258);
+  --brand-deepseek: oklch(0.54 0.18 258);
+  --brand-agy: oklch(0.58 0.15 155);
+  --brand-glm: oklch(0.32 0.01 260);
+
+  /* Grid & Edges */
+  --grid-dot: oklch(0.16 0.012 252 / 13%);
+  --edge-idle: oklch(0.16 0.012 252 / 22%);
+  --edge-live: oklch(0.54 0.165 245);
+
+  /* Architectural Gradients (Light) */
+  --grad-canvas: radial-gradient(62% 38% at 50% 0%, oklch(0.88 0.035 248 / 45%), transparent 72%),
+    linear-gradient(180deg, oklch(0.972 0.006 250) 0%, oklch(0.954 0.007 250) 100%);
+  --grad-rail: linear-gradient(180deg, oklch(0.958 0.007 250) 0%, oklch(0.934 0.008 250) 100%);
+  --grad-ribbon: linear-gradient(180deg, oklch(0.992 0.005 250) 0%, oklch(0.974 0.006 250) 100%);
+  --grad-surface: linear-gradient(180deg, oklch(0.992 0.005 250) 0%, oklch(0.976 0.006 250) 100%);
+  --grad-elevated: linear-gradient(180deg, oklch(0.995 0.005 250) 0%, oklch(0.978 0.006 250) 100%);
+  --grad-metric: linear-gradient(180deg, oklch(0.952 0.007 250) 0%, oklch(0.932 0.008 250) 100%);
+  --grad-prime: linear-gradient(135deg, oklch(0.58 0.165 245) 0%, oklch(0.47 0.155 252) 100%);
+  --grad-prime-hover: linear-gradient(135deg, oklch(0.62 0.17 245) 0%, oklch(0.51 0.16 252) 100%);
+  --grad-need-hero: radial-gradient(85% 120% at 0% 0%, oklch(0.82 0.11 72 / 34%), transparent 65%),
+    linear-gradient(135deg, oklch(0.975 0.025 74) 0%, oklch(0.985 0.006 250) 100%);
+  --grad-need-hero-sel: radial-gradient(85% 120% at 0% 0%, oklch(0.8 0.125 72 / 44%), transparent 65%),
+    linear-gradient(135deg, oklch(0.962 0.038 74) 0%, oklch(0.98 0.01 74) 100%);
+  --grad-inspector-work: radial-gradient(75% 110% at 0% 0%, oklch(0.54 0.165 245 / 12%), transparent 65%),
+    linear-gradient(180deg, oklch(0.992 0.006 250) 0%, oklch(0.974 0.007 250) 100%);
+  --grad-inspector-need: radial-gradient(75% 110% at 0% 0%, oklch(0.6 0.165 68 / 14%), transparent 65%),
+    linear-gradient(180deg, oklch(0.992 0.008 74) 0%, oklch(0.974 0.007 250) 100%);
+  --grad-inspector-bad: radial-gradient(75% 110% at 0% 0%, oklch(0.55 0.205 22 / 12%), transparent 65%),
+    linear-gradient(180deg, oklch(0.992 0.008 22) 0%, oklch(0.974 0.007 250) 100%);
+  --grad-bar-ok: linear-gradient(90deg, oklch(0.52 0.15 158) 0%, oklch(0.6 0.14 166) 100%);
+  --grad-bar-work: linear-gradient(90deg, oklch(0.52 0.165 248) 0%, oklch(0.64 0.145 236) 100%);
+  --grad-bar-need: linear-gradient(90deg, oklch(0.62 0.165 68) 0%, oklch(0.72 0.155 78) 100%);
+
+  --shadow-sm: 0 1px 2px oklch(0.16 0.012 252 / 7%);
+  --shadow-md: 0 8px 22px -6px oklch(0.16 0.012 252 / 14%), 0 1px 2px oklch(0.16 0.012 252 / 6%);
+  --shadow-lg: 0 20px 44px -12px oklch(0.16 0.012 252 / 22%), 0 2px 6px oklch(0.16 0.012 252 / 8%);
+  --shadow-prime: 0 2px 6px oklch(0.48 0.15 248 / 28%), 0 10px 22px -8px oklch(0.48 0.15 248 / 38%);
+  --focus-ring: oklch(0.54 0.165 245);
+
+  /* Dark Theme Palette Tokens — Obsidian Horizon (APCA Lc >= 65-95 calibrated, Raycast specular + Comeau layered shadows) */
+  --d-bg-canvas: oklch(0.098 0.012 252);
+  --d-bg-rail: oklch(0.088 0.011 252);
+  --d-bg-surface: oklch(0.152 0.014 252);
+  --d-bg-elevated: oklch(0.202 0.016 252);
+  --d-bg-inset: oklch(0.112 0.012 252);
+  --d-bg-hover: oklch(0.235 0.017 252);
+  --d-bg-active: oklch(0.275 0.02 250);
+  --d-ink-1: oklch(0.975 0.004 252);
+  --d-ink-2: oklch(0.845 0.009 252);
+  --d-ink-3: oklch(0.715 0.011 252);
+  --d-ink-inv: oklch(0.115 0.012 252);
+  --d-border: oklch(0.96 0.008 252 / 14%);
+  --d-border-strong: oklch(0.96 0.008 252 / 25%);
+  --d-border-subtle: oklch(0.96 0.008 252 / 8%);
+  --d-hi: inset 0 1px 0 oklch(0.98 0.01 252 / 15%);
+  --d-sig-work: oklch(0.77 0.145 236);
+  --d-sig-work-soft: oklch(0.77 0.145 236 / 18%);
+  --d-sig-work-border: oklch(0.77 0.145 236 / 48%);
+  --d-sig-need: oklch(0.84 0.155 76);
+  --d-sig-need-ink: oklch(0.14 0.035 74);
+  --d-sig-need-soft: oklch(0.84 0.155 76 / 18%);
+  --d-sig-need-border: oklch(0.84 0.155 76 / 54%);
+  --d-sig-bad: oklch(0.72 0.195 24);
+  --d-sig-bad-soft: oklch(0.72 0.195 24 / 18%);
+  --d-sig-bad-border: oklch(0.72 0.195 24 / 52%);
+  --d-sig-ok: oklch(0.78 0.145 160);
+  --d-sig-ok-soft: oklch(0.78 0.145 160 / 16%);
+  --d-sig-ok-border: oklch(0.78 0.145 160 / 46%);
+  --d-sig-idle: oklch(0.68 0.01 252);
+  --d-brand-claude: oklch(0.72 0.145 38);
+  --d-brand-codex-a: oklch(0.76 0.145 248);
+  --d-brand-codex-b: oklch(0.6 0.18 256);
+  --d-brand-deepseek: oklch(0.72 0.16 256);
+  --d-brand-agy: oklch(0.76 0.14 155);
+  --d-brand-glm: oklch(0.92 0.01 260);
+  --d-grid-dot: oklch(0.96 0.008 252 / 16%);
+  --d-edge-idle: oklch(0.96 0.008 252 / 28%);
+  --d-edge-live: oklch(0.77 0.145 236);
+  --d-grad-canvas: radial-gradient(72% 46% at 50% 0%, oklch(0.34 0.075 244 / 52%), transparent 72%),
+    radial-gradient(45% 40% at 92% 100%, oklch(0.28 0.055 238 / 28%), transparent 70%),
+    linear-gradient(180deg, oklch(0.118 0.014 252) 0%, oklch(0.088 0.011 252) 100%);
+  --d-grad-rail: linear-gradient(180deg, oklch(0.132 0.014 252) 0%, oklch(0.088 0.011 252) 100%);
+  --d-grad-ribbon: linear-gradient(180deg, oklch(0.182 0.016 252) 0%, oklch(0.142 0.013 252) 100%);
+  --d-grad-surface: linear-gradient(180deg, oklch(0.178 0.015 252) 0%, oklch(0.138 0.012 252) 100%);
+  --d-grad-elevated: linear-gradient(180deg, oklch(0.232 0.018 252) 0%, oklch(0.178 0.014 252) 100%);
+  --d-grad-metric: linear-gradient(180deg, oklch(0.168 0.015 252) 0%, oklch(0.125 0.012 252) 100%);
+  --d-grad-prime: linear-gradient(135deg, oklch(0.50 0.155 242) 0%, oklch(0.40 0.15 252) 100%);
+  --d-grad-prime-hover: linear-gradient(135deg, oklch(0.55 0.16 240) 0%, oklch(0.45 0.155 250) 100%);
+  --d-grad-need-hero: radial-gradient(92% 130% at 0% 0%, oklch(0.84 0.155 76 / 32%), transparent 66%),
+    linear-gradient(135deg, oklch(0.255 0.042 74) 0%, oklch(0.168 0.016 252) 100%);
+  --d-grad-need-hero-sel: radial-gradient(92% 130% at 0% 0%, oklch(0.84 0.155 76 / 42%), transparent 66%),
+    linear-gradient(135deg, oklch(0.285 0.052 74) 0%, oklch(0.186 0.018 252) 100%);
+  --d-grad-inspector-work: radial-gradient(82% 120% at 0% 0%, oklch(0.77 0.145 236 / 26%), transparent 66%),
+    linear-gradient(180deg, oklch(0.228 0.022 246) 0%, oklch(0.168 0.014 252) 100%);
+  --d-grad-inspector-need: radial-gradient(82% 120% at 0% 0%, oklch(0.84 0.155 76 / 28%), transparent 66%),
+    linear-gradient(180deg, oklch(0.24 0.032 74) 0%, oklch(0.168 0.014 252) 100%);
+  --d-grad-inspector-bad: radial-gradient(82% 120% at 0% 0%, oklch(0.72 0.195 24 / 26%), transparent 66%),
+    linear-gradient(180deg, oklch(0.232 0.028 24) 0%, oklch(0.168 0.014 252) 100%);
+  --d-grad-bar-ok: linear-gradient(90deg, oklch(0.7 0.15 160) 0%, oklch(0.82 0.14 168) 100%);
+  --d-grad-bar-work: linear-gradient(90deg, oklch(0.66 0.15 246) 0%, oklch(0.82 0.135 230) 100%);
+  --d-grad-bar-need: linear-gradient(90deg, oklch(0.76 0.16 68) 0%, oklch(0.88 0.145 80) 100%);
+  --d-shadow-sm: 0 1px 2px oklch(0.04 0.01 252 / 50%), 0 2px 6px oklch(0.04 0.01 252 / 35%);
+  --d-shadow-md: 0 2px 4px oklch(0.04 0.01 252 / 48%), 0 8px 16px -4px oklch(0.04 0.01 252 / 55%), 0 18px 36px -10px oklch(0.03 0.01 252 / 70%);
+  --d-shadow-lg: 0 2px 6px oklch(0.04 0.01 252 / 52%), 0 14px 28px -8px oklch(0.03 0.01 252 / 68%), 0 32px 64px -16px oklch(0.02 0.01 252 / 86%);
+  --d-shadow-prime: 0 1px 2px oklch(0.04 0.01 252 / 50%), 0 8px 20px -4px oklch(0.6 0.16 244 / 52%);
+  --d-focus-ring: oklch(0.78 0.145 236);
+
+  /* shadcn/ui semantic layer */
+  --background: var(--bg-canvas);
+  --foreground: var(--ink-1);
+  --card: var(--bg-surface);
+  --card-foreground: var(--ink-1);
+  --popover: var(--bg-elevated);
+  --popover-foreground: var(--ink-1);
+  --primary: var(--ink-1);
+  --primary-foreground: var(--ink-inv);
+  --secondary: var(--bg-inset);
+  --secondary-foreground: var(--ink-1);
+  --muted: var(--bg-inset);
+  --muted-foreground: var(--ink-3);
+  --accent: var(--bg-hover);
+  --accent-foreground: var(--ink-1);
+  --destructive: var(--sig-bad);
+  --destructive-foreground: var(--ink-inv);
+  --input: var(--border-strong);
+  --ring: var(--focus-ring);
+}
+
+.dark {
+  color-scheme: dark;
+  --bg-canvas: var(--d-bg-canvas);
+  --bg-rail: var(--d-bg-rail);
+  --bg-surface: var(--d-bg-surface);
+  --bg-elevated: var(--d-bg-elevated);
+  --bg-inset: var(--d-bg-inset);
+  --bg-hover: var(--d-bg-hover);
+  --bg-active: var(--d-bg-active);
+  --ink-1: var(--d-ink-1);
+  --ink-2: var(--d-ink-2);
+  --ink-3: var(--d-ink-3);
+  --ink-inv: var(--d-ink-inv);
+  --border: var(--d-border);
+  --border-strong: var(--d-border-strong);
+  --border-subtle: var(--d-border-subtle);
+  --hi: var(--d-hi);
+  --sig-work: var(--d-sig-work);
+  --sig-work-soft: var(--d-sig-work-soft);
+  --sig-work-border: var(--d-sig-work-border);
+  --sig-need: var(--d-sig-need);
+  --sig-need-text: var(--d-sig-need);
+  --sig-need-ink: var(--d-sig-need-ink);
+  --sig-need-soft: var(--d-sig-need-soft);
+  --sig-need-border: var(--d-sig-need-border);
+  --sig-bad: var(--d-sig-bad);
+  --sig-bad-soft: var(--d-sig-bad-soft);
+  --sig-bad-border: var(--d-sig-bad-border);
+  --sig-ok: var(--d-sig-ok);
+  --sig-ok-soft: var(--d-sig-ok-soft);
+  --sig-ok-border: var(--d-sig-ok-border);
+  --sig-idle: var(--d-sig-idle);
+  --brand-claude: var(--d-brand-claude);
+  --brand-codex-a: var(--d-brand-codex-a);
+  --brand-codex-b: var(--d-brand-codex-b);
+  --brand-deepseek: var(--d-brand-deepseek);
+  --brand-agy: var(--d-brand-agy);
+  --brand-glm: var(--d-brand-glm);
+  --grid-dot: var(--d-grid-dot);
+  --edge-idle: var(--d-edge-idle);
+  --edge-live: var(--d-edge-live);
+  --grad-canvas: var(--d-grad-canvas);
+  --grad-rail: var(--d-grad-rail);
+  --grad-ribbon: var(--d-grad-ribbon);
+  --grad-surface: var(--d-grad-surface);
+  --grad-elevated: var(--d-grad-elevated);
+  --grad-metric: var(--d-grad-metric);
+  --grad-prime: var(--d-grad-prime);
+  --grad-prime-hover: var(--d-grad-prime-hover);
+  --grad-need-hero: var(--d-grad-need-hero);
+  --grad-need-hero-sel: var(--d-grad-need-hero-sel);
+  --grad-inspector-work: var(--d-grad-inspector-work);
+  --grad-inspector-need: var(--d-grad-inspector-need);
+  --grad-inspector-bad: var(--d-grad-inspector-bad);
+  --grad-bar-ok: var(--d-grad-bar-ok);
+  --grad-bar-work: var(--d-grad-bar-work);
+  --grad-bar-need: var(--d-grad-bar-need);
+  --shadow-sm: var(--d-shadow-sm);
+  --shadow-md: var(--d-shadow-md);
+  --shadow-lg: var(--d-shadow-lg);
+  --shadow-prime: var(--d-shadow-prime);
+  --focus-ring: var(--d-focus-ring);
+}
+
+@theme inline {
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-heading: var(--font-sans);
+  --color-canvas: var(--bg-canvas);
+  --color-rail: var(--bg-rail);
+  --color-surface: var(--bg-surface);
+  --color-elevated: var(--bg-elevated);
+  --color-inset: var(--bg-inset);
+  --color-hover: var(--bg-hover);
+  --color-active: var(--bg-active);
+  --color-ink-1: var(--ink-1);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-inv: var(--ink-inv);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-line-subtle: var(--border-subtle);
+  --color-work: var(--sig-work);
+  --color-need: var(--sig-need);
+  --color-bad: var(--sig-bad);
+  --color-ok: var(--sig-ok);
+  --color-idle: var(--sig-idle);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+/* Base Floor — APCA readable console scale (15px base, 13px absolute floor) */
+html {
+  font-size: 16px;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: clip;
+  background: var(--bg-canvas);
+  color: var(--ink-1);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+::selection {
+  background: var(--sig-work-soft);
+  color: var(--ink-1);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Architectural gradient utilities */
+.ag-grad-canvas {
+  background: var(--grad-canvas);
+}
+
+.ag-grad-rail {
+  background: var(--grad-rail);
+}
+
+.ag-grad-ribbon {
+  background: var(--grad-ribbon);
+  box-shadow: var(--hi);
+}
+
+.ag-grad-surface {
+  background: var(--grad-surface);
+  box-shadow: var(--hi);
+}
+
+.ag-grad-elevated {
+  background: var(--grad-elevated);
+  box-shadow: var(--hi);
+}
+
+.ag-grad-metric {
+  background: var(--grad-metric);
+  box-shadow: var(--hi);
+}
+
+.ag-grad-prime {
+  background: var(--grad-prime);
+  color: var(--ink-inv);
+  box-shadow: var(--hi), var(--shadow-prime);
+}
+
+.dark .ag-grad-prime {
+  color: var(--ink-1);
+}
+
+.ag-grad-prime:hover {
+  background: var(--grad-prime-hover);
+}
+
+.ag-grad-need-hero {
+  background: var(--grad-need-hero);
+  box-shadow: var(--hi), var(--shadow-sm);
+}
+
+.ag-grad-need-hero[aria-pressed="true"] {
+  background: var(--grad-need-hero-sel);
+  box-shadow: var(--hi), var(--shadow-md);
+}
+
+.ag-inspector-head {
+  background: var(--grad-elevated);
+  box-shadow: var(--hi);
+}
+
+.ag-inspector-head[data-tone="work"] {
+  background: var(--grad-inspector-work);
+}
+
+.ag-inspector-head[data-tone="need"] {
+  background: var(--grad-inspector-need);
+}
+
+.ag-inspector-head[data-tone="bad"] {
+  background: var(--grad-inspector-bad);
+}
+
+.ag-bar-ok {
+  background: var(--grad-bar-ok);
+}
+
+.ag-bar-work {
+  background: var(--grad-bar-work);
+}
+
+.ag-bar-need {
+  background: var(--grad-bar-need);
+}
+
+/* Focus visible — instant, crisp */
+:where(button, a, input, textarea, select, [tabindex], [role="tab"], [role="row"]):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  transition: none;
+}
+
+.text-need {
+  color: var(--sig-need-text);
+}
+
+/* Tactile press feedback */
+@layer components {
+  .pressable {
+    cursor: pointer;
+    transition:
+      background-color var(--dur-fast) var(--ease-out),
+      border-color var(--dur-fast) var(--ease-out),
+      color var(--dur-fast) var(--ease-out),
+      opacity var(--dur-fast) var(--ease-out),
+      transform var(--dur-press) var(--ease-out);
+  }
+
+  .pressable:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  .pressable:disabled {
+    background: var(--bg-inset);
+    color: var(--ink-3);
+    cursor: not-allowed;
+  }
+}
+
+/* Subtle architectural scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--border-strong);
+  border-radius: 999px;
+}
+
+/* Live work pulse (opacity-only, compositor-safe) */
+@keyframes sig-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.animate-sig-pulse {
+  animation: sig-pulse 1.8s ease-in-out infinite;
+}
+
+/* Blueprint dot grid for Red (Topology) */
+.blueprint-grid {
+  background: var(--grad-canvas);
+  background-image: radial-gradient(var(--grid-dot) 1px, transparent 1px), var(--grad-canvas);
+  background-size: 20px 20px, 100% 100%;
+}
+
+/* React Flow overrides */
+.react-flow__controls {
+  background: var(--bg-surface) !important;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-sm) !important;
+  overflow: hidden;
+}
+
+.react-flow__controls-button {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid var(--border) !important;
+  color: var(--ink-2) !important;
+  fill: currentColor !important;
+  width: 32px !important;
+  height: 32px !important;
+}
+
+.react-flow__controls-button:last-child {
+  border-bottom: none !important;
+}
+
+.react-flow__controls-button:hover {
+  background: var(--bg-hover) !important;
+  color: var(--ink-1) !important;
+}
+
+.react-flow__node.reflow-node {
+  transition: transform 280ms var(--ease-out);
+}
+
+/* Markdown prose inside Informe, Viewer, Consultor */
+.prose-ag {
+  color: var(--ink-1);
+  font-size: 15px;
+  line-height: 1.65;
+  overflow-wrap: break-word;
+}
+
+.prose-ag p {
+  margin: 0.45em 0;
+}
+
+.prose-ag p:first-child {
+  margin-top: 0;
+}
+
+.prose-ag p:last-child {
+  margin-bottom: 0;
+}
+
+.prose-ag h1,
+.prose-ag h2,
+.prose-ag h3,
+.prose-ag h4 {
+  color: var(--ink-1);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  margin: 0.9em 0 0.35em;
+  text-wrap: balance;
+}
+
+.prose-ag h1 {
+  font-size: 16px;
+}
+
+.prose-ag h2 {
+  font-size: 14.5px;
+}
+
+.prose-ag h3,
+.prose-ag h4 {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.prose-ag ul,
+.prose-ag ol {
+  margin: 0.45em 0;
+  padding-left: 1.25em;
+}
+
+.prose-ag li {
+  margin: 0.2em 0;
+}
+
+.prose-ag code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 4px;
+}
+
+.prose-ag pre {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  overflow-x: auto;
+  margin: 0.6em 0;
+}
+
+.prose-ag pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.prose-ag table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin: 0.6em 0;
+}
+
+.prose-ag th,
+.prose-ag td {
+  border: 1px solid var(--border);
+  padding: 8px;
+  text-align: left;
+}
+
+.prose-ag th {
+  background: var(--bg-inset);
+  font-weight: 600;
+}
+
+.prose-ag blockquote {
+  border-left: 2px solid var(--border-strong);
+  margin: 0.5em 0;
+  padding-left: 12px;
+  color: var(--ink-2);
+}
+
+/* Dialog / Drawer / Tooltip entry & exit (<300ms, close faster than open) */
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes overlay-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes modal-out {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.97) translateY(2px);
+  }
+}
+
+@keyframes drawer-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes drawer-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+}
+
+.anim-overlay {
+  animation: overlay-in var(--dur-fast) var(--ease-out) forwards;
+}
+
+.anim-overlay[data-state="closed"] {
+  animation: overlay-out var(--dur-exit) var(--ease-out) forwards;
+}
+
+.anim-modal {
+  animation: modal-in var(--dur-overlay) var(--ease-out) forwards;
+}
+
+.anim-modal[data-state="closed"] {
+  animation: modal-out var(--dur-exit) var(--ease-out) forwards;
+}
+
+.anim-drawer {
+  animation: drawer-in var(--dur-overlay) var(--ease-out) forwards;
+}
+
+.anim-drawer[data-state="closed"] {
+  animation: drawer-out var(--dur-exit) var(--ease-out) forwards;
+}
+
+.anim-tooltip {
+  animation: overlay-in var(--dur-fast) var(--ease-out) forwards;
+}
+
+.anim-tooltip[data-state="closed"] {
+  animation: overlay-out var(--dur-tooltip-out) var(--ease-out) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-sig-pulse {
+    animation: none !important;
+  }
+
+  .pressable {
+    transition:
+      background-color 120ms ease,
+      border-color 120ms ease,
+      color 120ms ease,
+      opacity 120ms ease !important;
+  }
+
+  .pressable:active:not(:disabled) {
+    transform: none !important;
+  }
+
+  .react-flow__node.reflow-node {
+    transition: none !important;
+  }
+
+  .anim-overlay,
+  .anim-modal,
+  .anim-drawer,
+  .anim-tooltip {
+    animation-name: overlay-in !important;
+    animation-duration: 120ms !important;
+  }
+
+  .anim-overlay[data-state="closed"],
+  .anim-modal[data-state="closed"],
+  .anim-drawer[data-state="closed"],
+  .anim-tooltip[data-state="closed"] {
+    animation-name: overlay-out !important;
+    animation-duration: 120ms !important;
+  }
+}

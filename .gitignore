@@ -1,0 +1,18 @@
+# Build & dependencies
+target/
+app/node_modules/
+
+# Runtime state & logs
+cache/
+jobs/
+*.log
+.env
+.env.*
+
+# Test outputs & local tooling
+tests/e2e/results/
+tests/e2e/screenshots/
+.hallmark/
+HANDOFF.md
+__pycache__/
+.DS_Store

@@ -1,0 +1,40 @@
+[workspace]
+members = [".", "crates/agencia-core"]
+resolver = "3"
+
+[package]
+name = "agencia"
+version = "1.0.0-rc.1"
+edition = "2024"
+description = "Fast, local-first Rust control plane and real-time dashboard for orchestrating AI coding agents (Claude Code, OpenAI Codex, OpenCode, Antigravity) with cross-agent MCP bus."
+license = "MIT"
+repository = "https://github.com/Caliko06/agencia"
+readme = "README.md"
+keywords = ["ai-agents", "claude-code", "codex", "mcp", "orchestrator"]
+categories = ["command-line-utilities", "development-tools", "web-programming::http-server"]
+
+[[bin]]
+name = "agencia"
+path = "src/main.rs"
+
+[dependencies]
+agencia-core = { path = "crates/agencia-core" }
+axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "net", "macros", "sync", "time", "fs"] }
+futures-util = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+parking_lot = "0.12"
+regex = "1"
+rusqlite = { version = "0.37", features = ["bundled"] }
+libc = "0.2"
+ureq = { version = "2", default-features = false, features = ["json"] }
+walkdir = "2"
+sha2 = "0.10"
+glob = "0.3"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+
+[profile.release]
+opt-level = 3
+debug = false
+codegen-units = 16
