@@ -16,7 +16,7 @@ fn main() {
         .file_name()
         .and_then(|s| s.to_str())
         .unwrap_or("agencia")
-        .to_string();
+        .to_ascii_lowercase();
     let sub = argv.get(1).map(String::as_str).unwrap_or("");
     let code = match (base.as_str(), sub) {
         ("sesiones-bus", _) => bus_cli(&argv[1..]),
@@ -183,7 +183,7 @@ fn init_wizard(force: bool) -> i32 {
         .map(|p| p.display().to_string())
         .unwrap_or_else(|_| shared::root().join("target/release/agencia").display().to_string());
     println!("\nNext steps:");
-    println!("  1. Run `agencia` to start http://127.0.0.1:8800 and open the dashboard.");
+    println!("  1. Run `agencia` to start the local daemon (:8800) and open the dashboard in your browser.");
     println!("  2. To connect any MCP-capable agent to the `sesiones` bus, point it to:");
     println!("     command: {exe}  args: [\"mcp\"]");
     println!("  3. Want your own coding agent to adapt models/providers automatically?");

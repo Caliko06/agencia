@@ -14,5 +14,4 @@ tests/e2e/results/
 tests/e2e/screenshots/
 .hallmark/
 HANDOFF.md
-__pycache__/
 .DS_Store

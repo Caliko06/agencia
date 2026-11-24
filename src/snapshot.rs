@@ -98,7 +98,17 @@ fn repo_of(cwd: &str) -> String {
         a
     };
     let a = a.strip_suffix("-wt").unwrap_or(a);
-    if a.is_empty() { "~".into() } else { a.into() }
+    if a.is_empty() { "~".into() } else { disk_case(a) }
+}
+// macOS paths are case-insensitive: ~/tony and ~/Tony are one folder, so name the repo as the disk spells it.
+fn disk_case(name: &str) -> String {
+    fs::read_dir(home())
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .find(|n| n.eq_ignore_ascii_case(name))
+        .unwrap_or_else(|| name.into())
 }
 fn transcript(sid: &str, cwd: &str) -> String {
     let p = format!(
@@ -511,7 +521,7 @@ pub fn snapshot() -> Value {
             continue;
         }
         let age = tick - f.t1;
-        if s(m, "orig") == "codex_exec" && age > 900. || age > crate::shared::RECENT && !f.busy {
+        if !f.busy || age > crate::shared::RECENT {
             continue;
         }
         let st = if f.busy && age < 300. {
@@ -534,23 +544,19 @@ pub fn snapshot() -> Value {
                 continue;
             }
             let r=rows.iter().find(|r|s(r,"id")==cid).cloned().unwrap_or_else(||json!({"id":cid,"title":"","status":"","t":tick,"cwd":ps.procs.get(&pid).map(|p|p.cwd.clone()).unwrap_or_else(home),"agent":"","parent":""}));
-            let mut kids = rows
-                .iter()
-                .filter(|k| {
-                    s(k, "parent") == cid
-                        && !crate::shared::hidden(&format!("agy:{}", s(k, "id")))
-                        && (s(k, "status").ends_with("RUNNING")
-                            || tick - n(k, "t").max(mtime(&agy_tx(&s(k, "id")))) < 900.)
-                })
-                .map(|k| agy_card(k, false, vec![], None, &asked))
-                .collect::<Vec<_>>();
-            for j in &jobs {
-                if j.de == cid {
-                    used.insert(j.id.clone());
-                    kids.push(job_card(j, &jobs, &cxa, &ps, 0))
-                }
-            }
-            sort_cards(&mut kids);
+            let mut seen = HashSet::from([cid.clone()]);
+            let kids = agy_subs(
+                &cid,
+                &rows,
+                &jobs,
+                &mut used,
+                &cxa,
+                &ps,
+                &asked,
+                tick,
+                0,
+                &mut seen,
+            );
             wins.push(agy_card(&r, true, kids, Some(pid), &asked));
         }
     }

@@ -14,7 +14,7 @@ Monitor, launch, pause, inspect, and message **Claude Code**, **OpenAI Codex**, 
 
 <br />
 
-<img src="docs/assets/hero.png" alt="Agencia live agent hierarchy graph and cross-provider sesiones bus" width="100%" />
+<img src="docs/assets/hero.jpg" alt="Agencia live agent hierarchy graph and cross-provider sesiones bus" width="100%" />
 
 </div>
 

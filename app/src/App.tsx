@@ -21,7 +21,7 @@ import { buildDemoState } from "@/lib/demo"
 import { flat, toneOf, type Item } from "@/lib/tone"
 
 const initialView = (): View =>
-  VIEWS.find((v) => v === new URLSearchParams(location.search).get("v")) ?? "bandeja"
+  VIEWS.find((v) => v === new URLSearchParams(location.search).get("v")) ?? "red"
 
 const PORTFOLIO_DEMO = import.meta.env.VITE_PORTFOLIO_DEMO === "1"
 

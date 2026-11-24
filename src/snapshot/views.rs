@@ -89,7 +89,7 @@ pub fn agent(aid: &str) -> Option<Value> {
             let title = if root {
                 first_nonempty(&[s(&r, "title"), base(&cwd), cut(key, 8)])
             } else {
-                first_nonempty(&[s(&r, "agent"), s(&r, "title"), cut(key, 8)])
+                first_nonempty(&[s(&r, "role"), s(&r, "agent"), s(&r, "title"), cut(key, 8)])
             };
             d = json!({"title":title,"account":"antigravity","repo":repo_of(&cwd),"cwd":cwd.replace(&home(),"~"),"status":if run{"working"}else if root{"idle"}else{"done"},"request":first_nonempty(&[fd.last.clone(),fd.first.clone(),asked.get(key).cloned().unwrap_or_default()]),"reply":fd.say});
         }

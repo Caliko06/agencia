@@ -108,10 +108,11 @@ type NodeData = {
   hero?: boolean
   repoTag?: string
   busCount?: number
+  role?: "Ventana" | "Subagente"
   onOpenBus?: () => void
   onDetach?: () => void
 }
-type RootData = { need: number; work: number }
+type RootData = { label: string; need: number; work: number }
 type LabelData = { text: string }
 type ED = { kind: "own" | "bec"; live: boolean }
 type BusED = { topic: string; hops: string; threadId: string }
@@ -166,7 +167,7 @@ const AgentNode = memo(
     const steps = rows ? it.steps.slice(-rows).reverse() : []
     const rc = recapOf(it)
     const model = modelOf(it.model)
-    const showMeta = !far && hasMetaRow(it, data.repoTag, data.busCount)
+    const showMeta = !far && (Boolean(data.role) || hasMetaRow(it, data.repoTag, data.busCount))
 
     return (
       <div
@@ -222,6 +223,9 @@ const AgentNode = memo(
               <span className="max-w-[160px] truncate rounded border border-line-strong bg-elevated px-1.5 py-0.5 font-mono text-[12px] font-medium leading-none text-ink-2">
                 {data.repoTag}
               </span>
+            )}
+            {data.role && (
+              <span className="rounded border border-line-strong px-1.5 py-0.5 font-mono text-[12px] leading-none text-ink-2">{data.role.toLowerCase()}</span>
             )}
             {model && (
               <span className="rounded border border-line bg-inset px-1.5 py-0.5 font-mono text-[12px] leading-none text-ink-3">
@@ -321,7 +325,7 @@ const AgentNode = memo(
 )
 
 const RootNode = memo(({ data }: NodeProps<Node<RootData>>) => {
-  const { need, work } = data
+  const { label, need, work } = data
   const tone = need > 0 ? "need" : work > 0 ? "work" : "idle"
   const txt = need ? `${need} te ${need === 1 ? "espera" : "esperan"}` : work ? `${work} trabajando` : "en calma"
   return (
@@ -330,7 +334,7 @@ const RootNode = memo(({ data }: NodeProps<Node<RootData>>) => {
       className="flex items-center justify-center gap-2.5 rounded-lg border border-line-strong bg-elevated px-3 text-[13px] font-semibold text-ink-1 shadow-[var(--shadow-sm)]"
     >
       {handles}
-      <span>OWNER</span>
+      <span className="truncate">{label}</span>
       <span className="h-3.5 w-px bg-line" />
       <SignalBar tone={tone} className="h-3" />
       <span className="text-[12px] font-medium text-ink-2">{txt}</span>
@@ -494,6 +498,57 @@ function matchPeerToWin(p: BusPeer, wins: Win[]): string | null {
   return null
 }
 
+// Centered tree: every agent sits over its own subagents; siblings side by side, more than 3 leaves wrap in rows of 3.
+type TT = { id: string; w: number; h: number; kids: TT[] }
+function tidy(root: TT, x0: number, y0: number) {
+  const pos: Record<string, P> = {}
+  const dims = new Map<string, [number, number]>()
+  const slots = (t: TT): (TT | TT[])[] => {
+    if (t.kids.length <= 3) return t.kids
+    const leaves = t.kids.filter((k) => !k.kids.length)
+    return [...t.kids.filter((k) => k.kids.length), ...(leaves.length ? [leaves] : [])]
+  }
+  const grid = (l: TT[]): [number, number] => {
+    const cols = Math.min(3, l.length)
+    let h = 0
+    for (let r = 0; r < l.length; r += 3) h += Math.max(...l.slice(r, r + 3).map((k) => k.h)) + (r ? GAP / 2 : 0)
+    return [cols * CARD.w + (cols - 1) * GAP, h]
+  }
+  const size = (s: TT | TT[]): [number, number] => (Array.isArray(s) ? grid(s) : dim(s))
+  const rowW = (sl: (TT | TT[])[]) => sl.reduce((a, s) => a + size(s)[0], 0) + GAP * Math.max(0, sl.length - 1)
+  function dim(t: TT): [number, number] {
+    let d = dims.get(t.id)
+    if (!d) {
+      const sl = slots(t)
+      d = [Math.max(t.w, rowW(sl)), t.h + (sl.length ? RANK + Math.max(...sl.map((s) => size(s)[1])) : 0)]
+      dims.set(t.id, d)
+    }
+    return d
+  }
+  const place = (t: TT, x: number, y: number) => {
+    const [w] = dim(t)
+    const sl = slots(t)
+    pos[t.id] = { x: x + (w - t.w) / 2, y }
+    let cx = x + (w - rowW(sl)) / 2
+    const cy = y + t.h + RANK
+    for (const s of sl) {
+      if (Array.isArray(s)) {
+        let ry = cy
+        for (let r = 0; r < s.length; r += 3) {
+          const row = s.slice(r, r + 3)
+          const rw = row.length * CARD.w + (row.length - 1) * GAP
+          row.forEach((k, i) => (pos[k.id] = { x: cx + (grid(s)[0] - rw) / 2 + i * (CARD.w + GAP), y: ry }))
+          ry += Math.max(...row.map((k) => k.h)) + GAP / 2
+        }
+      } else place(s, cx, cy)
+      cx += size(s)[0] + GAP
+    }
+  }
+  place(root, x0, y0)
+  const [w, h] = dim(root)
+  return { pos, w, h }
+}
+
 function GraphCanvas({
   entries,
   need,
@@ -563,85 +618,56 @@ function GraphCanvas({
     const sub = (c: Card) => c.children ?? []
     const multi = entries.length > 1
     const multiRepo = new Set(entries.map((e) => e.repoName)).size > 1
-    const hy = ROOT.h + RANK
-    const plans = entries.map((entry) => {
-      const liveKids = entry.kids.filter((c) => sub(c).length || isWin(c as Item) || toneOf(c) === "work" || toneOf(c) === "need")
-      const freeKids = entry.kids.filter((c) => !liveKids.includes(c))
-      const maxCols = multi ? 2 : 3
-      const cols = Math.min(maxCols, Math.max(1, liveKids.length, freeKids.length ? Math.min(maxCols, freeKids.length) : 0))
-      const width = Math.max(cols * CARD.w + (cols - 1) * GAP, CARD.hero)
-      return { entry, liveKids, freeKids, cols, width }
-    })
-    const totalW = plans.reduce((s, p) => s + p.width, 0) + Math.max(0, plans.length - 1) * SUBTREE_GAP
-    const rootCx = totalW / 2
-    const ns: Node[] = [
-      { id: "root", type: "root", position: { x: rootCx - ROOT.w / 2, y: 0 }, data: { need, work } satisfies RootData, draggable: false, selectable: false },
-    ]
     const es: Edge[] = []
     const treeEs: Edge[] = []
+    const ns: Node[] = []
     const fGroups: { labelId: string; ids: string[] }[] = []
-
     let xOff = 0
-    for (const plan of plans) {
-      const { entry, liveKids, freeKids, cols, width } = plan
+    const winIds: [string, boolean, number][] = []
+    for (const entry of entries) {
       const { win, repoName, primary } = entry
-      const cx = xOff + width / 2
-      const winItems = flat(win)
-      const winLive = winItems.some((c) => toneOf(c) === "need" || isWork(c))
+      const liveKids = entry.kids.filter((c) => sub(c).length || isWin(c as Item) || toneOf(c) === "work" || toneOf(c) === "need")
+      const freeKids = entry.kids.filter((c) => !liveKids.includes(c))
       const repoTag = multiRepo || !primary ? repoName : undefined
       const busCount = winBusCounts.get(win.id) ?? 0
       ns.push({
         id: win.id,
         type: "agent",
-        position: { x: cx - CARD.hero / 2, y: hy },
-        data: {
-          it: win,
-          rows: rowsOf(win),
-          hero: true,
-          repoTag,
-          busCount,
-          onOpenBus: () => onOpenBusThread(),
-          onDetach: primary ? undefined : () => onDetach(win.id),
-        } satisfies NodeData,
+        position: { x: 0, y: 0 },
+        data: { it: win, rows: rowsOf(win), hero: true, role: "Ventana", repoTag, busCount, onOpenBus: () => onOpenBusThread(), onDetach: primary ? undefined : () => onDetach(win.id) } satisfies NodeData,
       })
-      const rootEdge: Edge = { id: "e-root-" + win.id, source: "root", target: win.id, type: "flow", data: { kind: "own", live: winLive } satisfies ED }
-      es.push(rootEdge)
-      treeEs.push(rootEdge)
-
-      let y = hy + H(win, repoTag, busCount) + RANK
-      const place = (list: Card[], from = win.id) => {
-        for (let r = 0; r * cols < list.length; r++) {
-          const row = list.slice(r * cols, r * cols + cols)
-          const rw = row.length * CARD.w + (row.length - 1) * GAP
-          row.forEach((c, i) => {
-            ns.push({ id: c.id, type: "agent", position: { x: cx - rw / 2 + i * (CARD.w + GAP), y }, data: { it: c, rows: rowsOf(c) } satisfies NodeData })
-            const edge: Edge = { id: "e-" + from + "-" + c.id, source: from, target: c.id, type: "flow", data: { kind: kindOf(c) === "bec" ? "bec" : "own", live: isWork(c) } satisfies ED }
-            es.push(edge)
-            treeEs.push(edge)
-          })
-          y += Math.max(...row.map((c) => H(c))) + GAP / 2
-        }
+      const grow = (c: Card, from: string): TT => {
+        ns.push({ id: c.id, type: "agent", position: { x: 0, y: 0 }, data: { it: c, rows: rowsOf(c), role: "Subagente" } satisfies NodeData })
+        const edge: Edge = { id: "e-" + from + "-" + c.id, source: from, target: c.id, type: "flow", data: { kind: kindOf(c) === "bec" ? "bec" : "own", live: isWork(c) } satisfies ED }
+        es.push(edge)
+        treeEs.push(edge)
+        return { id: c.id, w: CARD.w, h: H(c), kids: sub(c).map((k) => grow(k, c.id)) }
       }
-      place(liveKids)
-      const deeper = (list: Card[]) => {
-        for (const w of list) {
-          if (sub(w).length) {
-            y += GAP / 2
-            place(sub(w), w.id)
-            deeper(sub(w))
-          }
-        }
-      }
-      deeper(liveKids)
+      const tree: TT = { id: win.id, w: CARD.hero, h: H(win, repoTag, busCount), kids: liveKids.map((c) => grow(c, win.id)) }
+      const lay = tidy(tree, xOff, ROOT.h + RANK)
+      winIds.push([win.id, flat(win).some(isWork), xOff + lay.w / 2])
+      const at = (id: string) => ns.find((n) => n.id === id)!
+      for (const [id, p] of Object.entries(lay.pos)) at(id).position = p
+      let y = ROOT.h + RANK + lay.h
+      let width = lay.w
       if (freeKids.length) {
-        if (liveKids.length) y += GAP
+        y += GAP
         const labelId = multi ? `libres:${win.id}` : "libres"
-        ns.push({ id: labelId, type: "label", position: { x: cx - width / 2, y }, data: { text: `Libres (${freeKids.length})` } satisfies LabelData, draggable: false, selectable: false })
-        y += 28
-        place(freeKids)
+        const free = tidy({ id: "_", w: 0, h: 0, kids: freeKids.map((c) => grow(c, win.id)) }, xOff, y + 28 - RANK)
+        width = Math.max(width, free.w)
+        delete free.pos._
+        ns.push({ id: labelId, type: "label", position: { x: Math.min(...Object.values(free.pos).map((q) => q.x)), y }, data: { text: `Libres (${freeKids.length})` } satisfies LabelData, draggable: false, selectable: false })
+        for (const [id, p] of Object.entries(free.pos)) at(id).position = p
         fGroups.push({ labelId, ids: freeKids.map((c) => c.id) })
       }
       xOff += width + SUBTREE_GAP
+    }
+
+    const rootLabel = Array.from(new Set(entries.map((e) => e.repoName))).join(" + ")
+    const rootX = winIds.length ? (winIds[0][2] + winIds[winIds.length - 1][2]) / 2 : 0
+    ns.unshift({ id: "root", type: "root", position: { x: rootX - ROOT.w / 2, y: 0 }, data: { label: rootLabel, need, work } satisfies RootData, draggable: false, selectable: false })
+    for (const [id, live] of winIds) {
+      es.push({ id: "e-root-" + id, source: "root", target: id, type: "flow", data: { kind: "own", live } satisfies ED })
     }
 
     for (const be of busEdgeList) {
@@ -1415,8 +1441,8 @@ export function RedView({
 
   const entries = useMemo<CanvasEntry[]>(() => {
     const filterKids = (w: Win) => (w.children ?? []).filter((c) => fil === "all" || groupOf(c) === fil)
-    const out: CanvasEntry[] = [{ win, repoName: repo.name, kids: filterKids(win), primary: true }]
-    const seen = new Set<string>([win.id])
+    const out: CanvasEntry[] = repo.windows.map((w) => ({ win: w, repoName: repo.name, kids: filterKids(w), primary: true }))
+    const seen = new Set<string>(repo.windows.map((w) => w.id))
     for (const id of joinedIds) {
       if (seen.has(id)) continue
       const found = winLookup.get(id)
@@ -1425,7 +1451,7 @@ export function RedView({
       out.push({ win: found.win, repoName: found.repoName, kids: filterKids(found.win), primary: false })
     }
     return out
-  }, [win, repo.name, joinedIds, winLookup, fil])
+  }, [repo, joinedIds, winLookup, fil])
 
   const activeIds = useMemo(() => new Set(entries.map((e) => e.win.id)), [entries])
   const canvasItems = useMemo(() => entries.flatMap((e) => flat(e.win)), [entries])
@@ -1917,11 +1943,11 @@ export function RedView({
             ))}
           </div>
 
-          {entries.length > 1 && (
+          {entries.some((e) => !e.primary) && (
             <div className="pointer-events-auto inline-flex flex-wrap items-center gap-1 rounded-md border border-[var(--sig-work-border)] bg-surface px-2 py-1 text-[12px] shadow-[var(--shadow-sm)]">
               <Link2 className="size-3 shrink-0 text-work" />
-              <span className="font-medium text-ink-1">Red unida ({entries.length})</span>
-              {entries.slice(1).map((e) => (
+              <span className="font-medium text-ink-1">Red unida ({entries.filter((e) => !e.primary).length})</span>
+              {entries.filter((e) => !e.primary).map((e) => (
                 <span
                   key={e.win.id}
                   className="inline-flex items-center gap-1 rounded border border-line bg-inset px-1.5 py-0.5 font-mono text-[11px] text-ink-2"

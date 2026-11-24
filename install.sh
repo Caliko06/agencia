@@ -6,7 +6,7 @@ BIN_DST="${HOME}/.local/bin"
 BINARY="${REPO_DIR}/target/release/agencia"
 
 echo "==> Building Agencia (release)..."
-(cd "${REPO_DIR}" && cargo build --release)
+(cd "${REPO_DIR}" && cargo build --release --workspace)
 
 echo "==> Linking multicall CLI tools in ${REPO_DIR}/bin and ${BIN_DST}..."
 mkdir -p "${BIN_DST}" "${REPO_DIR}/bin"
@@ -46,4 +46,4 @@ if ! echo ":${PATH}:" | grep -q ":${BIN_DST}:"; then
   echo "==> Add ${BIN_DST} to your PATH to run 'agencia' from any directory:"
   echo "    echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zshrc && source ~/.zshrc"
 fi
-echo "==> Done! Run 'agencia' to start and open http://127.0.0.1:8800"
+echo "==> Done! Run 'agencia' to open http://127.0.0.1:8800."

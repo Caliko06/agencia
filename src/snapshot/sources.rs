@@ -418,18 +418,11 @@ pub(super) fn oc_windows(ps: &procs::ProcSnapshot) -> Vec<Value> {
             tui.insert(s(x, "id"));
         }
     }
-    let mut selected = mine
+    let selected = mine
         .iter()
         .filter(|x| tui.contains(&s(x, "id")))
         .copied()
         .collect::<Vec<_>>();
-    selected.extend(
-        mine.into_iter()
-            .filter(|x| {
-                !tui.contains(&s(x, "id")) && now() - n(&x["time"], "updated") / 1000. < 43200.
-            })
-            .take(8),
-    );
     let mut out = vec![];
     for x in selected {
         let id = format!("oc:{}", s(x, "id"));
@@ -495,6 +488,78 @@ pub(super) fn agy_tx(id: &str) -> String {
 }
 static AGY: LazyLock<Mutex<(f64, Vec<Value>, HashMap<String, String>)>> =
     LazyLock::new(|| Mutex::new((0., vec![], HashMap::new())));
+fn proto_varint(b: &[u8], i: &mut usize) -> Option<u64> {
+    let mut val = 0u64;
+    let mut shift = 0u32;
+    while *i < b.len() && shift < 64 {
+        let byte = b[*i];
+        *i += 1;
+        val |= ((byte & 0x7f) as u64) << shift;
+        if byte & 0x80 == 0 {
+            return Some(val);
+        }
+        shift += 7;
+    }
+    None
+}
+
+fn proto_field_bytes<'a>(b: &'a [u8], target_field: u64) -> Option<&'a [u8]> {
+    let mut i = 0;
+    while i < b.len() {
+        let tag = proto_varint(b, &mut i)?;
+        let field = tag >> 3;
+        let wire = tag & 7;
+        match wire {
+            0 => {
+                proto_varint(b, &mut i)?;
+            }
+            1 => {
+                if i + 8 > b.len() {
+                    return None;
+                }
+                i += 8;
+            }
+            2 => {
+                let len = proto_varint(b, &mut i)? as usize;
+                if i + len > b.len() {
+                    return None;
+                }
+                let slice = &b[i..i + len];
+                i += len;
+                if field == target_field {
+                    return Some(slice);
+                }
+            }
+            5 => {
+                if i + 4 > b.len() {
+                    return None;
+                }
+                i += 4;
+            }
+            _ => return None,
+        }
+    }
+    None
+}
+
+/// Extracts the human-readable subagent role from Antigravity's `raw_summary` protobuf blob
+/// (`metadata` field 17 -> `subagent_info` field 8 -> `role` field 2).
+pub(super) fn agy_proto_role(blob: &[u8]) -> String {
+    let Some(meta) = proto_field_bytes(blob, 17) else {
+        return String::new();
+    };
+    let Some(info) = proto_field_bytes(meta, 8) else {
+        return String::new();
+    };
+    let Some(role) = proto_field_bytes(info, 2) else {
+        return String::new();
+    };
+    std::str::from_utf8(role)
+        .ok()
+        .map(|s| s.trim().to_string())
+        .unwrap_or_default()
+}
+
 pub(super) fn agy_rows() -> (Vec<Value>, HashMap<String, String>) {
     let mut cache = AGY.lock();
     if now() - cache.0 < 3. {
@@ -505,13 +570,70 @@ pub(super) fn agy_rows() -> (Vec<Value>, HashMap<String, String>) {
         OpenFlags::SQLITE_OPEN_READ_ONLY,
     ) {
         let _ = c.busy_timeout(std::time::Duration::from_millis(200));
-        if let Ok(mut q)=c.prepare("select conversation_id,title,status,step_count,last_modified_time,workspace_uris,agent_name,parent_conversation_id from conversation_summaries"){if let Ok(rows)=q.query_map([],|r|{let id:String=r.get(0)?;let ts:String=r.get::<_,Option<String>>(4)?.unwrap_or_default();let dbt=chrono::NaiveDateTime::parse_from_str(&cut(&ts,19),"%Y-%m-%d %H:%M:%S").map(|t|t.and_utc().timestamp().max(0) as f64).unwrap_or(0.);let ws:String=r.get::<_,Option<String>>(5)?.unwrap_or_default();let ws:Value=serde_json::from_str(&ws).unwrap_or(Value::Null);let cwd=ws[0].as_str().unwrap_or("").replace("file://","");Ok(json!({"id":id,"title":r.get::<_,Option<String>>(1)?.unwrap_or_default(),"status":r.get::<_,Option<String>>(2)?.unwrap_or_default(),"steps":r.get::<_,i64>(3)?,"t":if dbt==0.||now()-dbt<86400.{dbt.max(mtime(&agy_tx(&id)))}else{dbt},"cwd":cwd,"agent":r.get::<_,Option<String>>(6)?.unwrap_or_default(),"parent":r.get::<_,Option<String>>(7)?.unwrap_or_default()}))}){cache.1=rows.flatten().collect()}}
+        if let Ok(mut q) = c.prepare(
+            "select conversation_id,title,status,step_count,last_modified_time,workspace_uris,agent_name,parent_conversation_id,not_fully_idle,killed,raw_summary from conversation_summaries",
+        ) {
+            if let Ok(rows) = q.query_map([], |r| {
+                let id: String = r.get(0)?;
+                let ts: String = r.get::<_, Option<String>>(4)?.unwrap_or_default();
+                let dbt = chrono::NaiveDateTime::parse_from_str(&cut(&ts, 19), "%Y-%m-%d %H:%M:%S")
+                    .map(|t| t.and_utc().timestamp().max(0) as f64)
+                    .unwrap_or(0.);
+                let ws: String = r.get::<_, Option<String>>(5)?.unwrap_or_default();
+                let ws: Value = serde_json::from_str(&ws).unwrap_or(Value::Null);
+                let cwd = ws[0].as_str().unwrap_or("").replace("file://", "");
+                let not_fully_idle = r.get::<_, Option<i64>>(8)?.unwrap_or(0) != 0;
+                let killed = r.get::<_, Option<i64>>(9)?.unwrap_or(0) != 0;
+                let raw: Vec<u8> = r.get::<_, Option<Vec<u8>>>(10)?.unwrap_or_default();
+                let role = agy_proto_role(&raw);
+                Ok(json!({
+                    "id": id,
+                    "title": r.get::<_, Option<String>>(1)?.unwrap_or_default(),
+                    "status": r.get::<_, Option<String>>(2)?.unwrap_or_default(),
+                    "steps": r.get::<_, i64>(3)?,
+                    "t": if dbt == 0. || now() - dbt < 86400. {
+                        dbt.max(mtime(&agy_tx(&id)))
+                    } else {
+                        dbt
+                    },
+                    "cwd": cwd,
+                    "agent": r.get::<_, Option<String>>(6)?.unwrap_or_default(),
+                    "parent": r.get::<_, Option<String>>(7)?.unwrap_or_default(),
+                    "not_fully_idle": not_fully_idle,
+                    "killed": killed,
+                    "role": role,
+                }))
+            }) {
+                cache.1 = rows.flatten().collect()
+            }
+        }
     }
-    let by: HashMap<String, String> = cache.1.iter().map(|r| (s(r, "id"), s(r, "cwd"))).collect();
+    let by_cwd: HashMap<String, String> =
+        cache.1.iter().map(|r| (s(r, "id"), s(r, "cwd"))).collect();
+    let by_parent: HashMap<String, String> = cache
+        .1
+        .iter()
+        .map(|r| (s(r, "id"), s(r, "parent")))
+        .collect();
+    let agy_prefix = format!("{}/", agy_dir());
     for r in &mut cache.1 {
-        if s(r, "cwd").starts_with(&format!("{}/", agy_dir())) {
-            if let Some(cwd) = by.get(&s(r, "parent")) {
-                r["cwd"] = json!(cwd)
+        let mut cur_cwd = s(r, "cwd");
+        if cur_cwd.is_empty() || cur_cwd.starts_with(&agy_prefix) {
+            let mut p = s(r, "parent");
+            for _ in 0..8 {
+                if p.is_empty() {
+                    break;
+                }
+                if let Some(pcwd) = by_cwd.get(&p) {
+                    if !pcwd.is_empty() && !pcwd.starts_with(&agy_prefix) {
+                        cur_cwd = pcwd.clone();
+                        break;
+                    }
+                }
+                p = by_parent.get(&p).cloned().unwrap_or_default();
+            }
+            if !cur_cwd.is_empty() {
+                r["cwd"] = json!(cur_cwd);
             }
         }
     }
@@ -528,6 +650,65 @@ pub(super) fn agy_rows() -> (Vec<Value>, HashMap<String, String>) {
     cache.0 = now();
     (cache.1.clone(), cache.2.clone())
 }
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn agy_subs(
+    parent_cid: &str,
+    rows: &[Value],
+    jobs: &[JobRecord],
+    used: &mut HashSet<String>,
+    cxa: &[(String, String)],
+    ps: &procs::ProcSnapshot,
+    asked: &HashMap<String, String>,
+    tick: f64,
+    depth: usize,
+    seen: &mut HashSet<String>,
+) -> Vec<Value> {
+    let mut kids = vec![];
+    if depth >= 10 {
+        return kids;
+    }
+    for k in rows {
+        if s(k, "parent") != parent_cid {
+            continue;
+        }
+        let kid_id = s(k, "id");
+        if kid_id.is_empty()
+            || crate::shared::hidden(&format!("agy:{kid_id}"))
+            || !seen.insert(kid_id.clone())
+        {
+            continue;
+        }
+        let sub_kids = agy_subs(
+            &kid_id,
+            rows,
+            jobs,
+            used,
+            cxa,
+            ps,
+            asked,
+            tick,
+            depth + 1,
+            seen,
+        );
+        let is_running = s(k, "status").ends_with("RUNNING");
+        let not_idle = k["not_fully_idle"].as_bool().unwrap_or(false)
+            && !k["killed"].as_bool().unwrap_or(false);
+        let recent = tick - n(k, "t").max(mtime(&agy_tx(&kid_id))) < 900.;
+        if !sub_kids.is_empty() || is_running || not_idle || recent {
+            kids.push(agy_card(k, false, sub_kids, None, asked));
+        }
+    }
+    let prefixed = format!("agy:{parent_cid}");
+    for j in jobs {
+        if (j.de == parent_cid || j.de == prefixed) && used.insert(j.id.clone()) {
+            kids.push(job_card(j, jobs, cxa, ps, 0));
+        }
+    }
+    sort_cards(&mut kids);
+    kids
+}
+
 pub(super) fn agy_card(
     r: &Value,
     root: bool,
@@ -538,7 +719,11 @@ pub(super) fn agy_card(
     let tx = agy_tx(&s(r, "id"));
     let tm = mtime(&tx);
     let f = feed(&tx, false);
-    let running = s(r, "status").ends_with("RUNNING") || f.busy && now() - f.t1.max(tm) < 300.;
+    let killed = r["killed"].as_bool().unwrap_or(false);
+    let live_kids = kids.iter().filter(|k| s(k, "status") == "working").count();
+    let self_running =
+        !killed && (s(r, "status").ends_with("RUNNING") || f.busy && now() - f.t1.max(tm) < 300.);
+    let running = self_running || (!killed && !root && live_kids > 0);
     let st = if running {
         "working"
     } else if root {
@@ -554,8 +739,14 @@ pub(super) fn agy_card(
         asked.get(&s(r, "id")).cloned().unwrap_or_default()
     };
     let id = format!("agy:{}", s(r, "id"));
-    let l = if running {
+    let l = if self_running {
         line(&id, &request, &f)
+    } else if running && live_kids > 0 {
+        if live_kids == 1 {
+            "Coordinando 1 subagente activo".into()
+        } else {
+            format!("Coordinando {live_kids} subagentes activos")
+        }
     } else if !f.say.is_empty() {
         md(&f.say, 200)
     } else {
@@ -565,6 +756,8 @@ pub(super) fn agy_card(
     };
     let upd = n(r, "t").max(f.t1).max(tm);
     let cwd = s(r, "cwd");
+    let role = s(r, "role");
+    let agent = s(r, "agent");
     let title = if root {
         if !s(r, "title").is_empty() {
             s(r, "title")
@@ -573,19 +766,64 @@ pub(super) fn agy_card(
         } else {
             cut(&s(r, "id"), 8)
         }
+    } else if !role.is_empty() {
+        role
+    } else if !agent.is_empty() {
+        agent.clone()
+    } else if !s(r, "title").is_empty() {
+        s(r, "title")
     } else {
-        r["agent"]
-            .as_str()
-            .filter(|s| !s.is_empty())
-            .or(r["title"].as_str().filter(|s| !s.is_empty()))
-            .unwrap_or("subagente")
-            .into()
+        "subagente".into()
     };
     if !root {
-        let mut c = card(&id, "sub", &title, "Antigravity", &request, st, &f, &l, upd);
+        let who = if !agent.is_empty() && title != agent {
+            agent
+        } else {
+            "Antigravity".into()
+        };
+        let mut c = card(&id, "sub", &title, &who, &request, st, &f, &l, upd);
         c["repo"] = json!(repo_of(&cwd));
         c["cuenta"] = json!("antigravity");
+        c["children"] = json!(kids);
         return c;
     }
     json!({"id":id,"kind":"agy","account":"antigravity","title":title,"repo":repo_of(&cwd),"cwd":cwd.replace(&home(),"~"),"status":st,"request":cut(&request,6000),"now":l,"steps":steps(&f.ev,5),"errs":f.errs,"updated":upd,"model":f.model,"usage":usage(&tx,false),"children":kids,"pid":pid,"linked":pid.is_some_and(|p|jload(&crate::shared::cache_dir().join(format!("agy/{p}.json")).to_string_lossy()).is_object()),"re":recent(&f)})
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn agy_proto_role_extracts_nested_field_17_8_2() {
+        fn push_varint(out: &mut Vec<u8>, mut v: u64) {
+            loop {
+                let mut b = (v & 0x7f) as u8;
+                v >>= 7;
+                if v != 0 {
+                    b |= 0x80;
+                }
+                out.push(b);
+                if v == 0 {
+                    break;
+                }
+            }
+        }
+        fn encode_len_field(field: u64, payload: &[u8]) -> Vec<u8> {
+            let mut out = vec![];
+            push_varint(&mut out, (field << 3) | 2);
+            push_varint(&mut out, payload.len() as u64);
+            out.extend_from_slice(payload);
+            out
+        }
+        let info = [
+            encode_len_field(1, b"teamwork_worker"),
+            encode_len_field(2, b"M1 host loader and Win32/MSVCRT"),
+        ]
+        .concat();
+        let meta = encode_len_field(8, &info);
+        let raw = encode_len_field(17, &meta);
+        assert_eq!(agy_proto_role(&raw), "M1 host loader and Win32/MSVCRT");
+        assert_eq!(agy_proto_role(&[]), "");
+    }
 }
